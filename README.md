@@ -1,7 +1,7 @@
 # GTHM26
 
 
-The tool can be executed by running the following example calculatin ghazard curves for the  for the DART 21416 and using the Kurils Japan subduction zone source area:
+The tool can be executed by running the following example calculating hazard curves for the DART 21416 and using the Kurils Japan subduction zone source area:
 
 ```
 python -m gthm26 --subd kurilsjapan --poi DART-21416 --subd_id 009 --output_path path_to_output_folder --rupt_file path_to_ruptures_file.nc --gf_path path_to_greens_functions_folder --plot
@@ -19,7 +19,8 @@ The user can select a subduction `subname` then click on `TSUNAMI_EVENTS` folder
 Green Functions database can be downloaded from here etc etc etc
 
 
-documentation in progress
+> [!important]
+> documentation in progress
 
 
 
