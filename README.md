@@ -1,6 +1,11 @@
 # GTHM26
 
 
+> [!important]
+> documentation in progress
+
+
+
 The tool can be executed by running the following example calculating hazard curves for the DART 21416 and using the Kurils Japan subduction zone source area:
 
 ```
@@ -17,11 +22,6 @@ The user can select a subduction `subname` then click on `TSUNAMI_EVENTS` folder
 
 
 Green Functions database can be downloaded from here etc etc etc
-
-
-> [!important]
-> documentation in progress
-
 
 
 
