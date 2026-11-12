@@ -1,7 +1,7 @@
 import argparse
 import sys
 
-import gthm26.workflow as gthm26
+import gthm.workflow as gthm
 
 def get_parser_args():
     parser = argparse.ArgumentParser(description='Script and input.')
@@ -20,7 +20,7 @@ def main():
     args = get_parser_args()
     try:
         
-        gthm26.run(args)
+        gthm.run(args)
         return 0
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)

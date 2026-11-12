@@ -1,15 +1,15 @@
-# GTHM26
+# Global Tsunami Hazard Model (GTHM) 
 
 
 > [!important]
 > documentation in progress
 
-
+This is the software implementation of the Global Tsunami Hazard Model (GTHM).
 
 The tool can be executed by running the following example calculating hazard curves for the DART 21416 and using the Kurils Japan subduction zone source area:
 
 ```
-python -m gthm26 --subd kurilsjapan --poi DART-21416 --subd_id 009 --output_path path_to_output_folder --rupt_file path_to_ruptures_file.nc --gf_path path_to_greens_functions_folder --plot
+python -m gthm --subd kurilsjapan --poi DART-21416 --subd_id 009 --output_path path_to_output_folder --rupt_file path_to_ruptures_file.nc --gf_path path_to_greens_functions_folder --plot
 ```
 
 where `path_to_output_folder`, `path_to_ruptures_file.nc` and `path_to_greens_functions_folder` depends on where the user place these files in her/his own machine.
