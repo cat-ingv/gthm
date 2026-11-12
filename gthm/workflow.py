@@ -10,11 +10,19 @@ import pandas as pd
 #sys.path.append('src')
 from . import utilities 
 
+def greens_law(poi_dep, nomin_d=None):
+    '''
+    '''
+    if nomin_d is None:
+        nomin_d = 1.
 
-# id in Davies to Remap
+    return (abs(poi_dep)/nomin_d)**0.25
+
 
 def remap(elem, nrows, ncols):
-    
+    '''
+    id in Davies to Remap
+    '''
     elem0 = elem - 1    # elem starts from 0
     r = elem0 % nrows   # posizione lungo dip
     c = elem0 // nrows  # posizione lungo strike
@@ -31,43 +39,17 @@ def safe_float(val):
         return None
 
 
-
-def run(args):
-    # parser = argparse.ArgumentParser(description='Script and input.')
-    # parser.add_argument('--subd', type=str, help='please, put subduction name', required=True)
-    # parser.add_argument('--poi', type=str, help='please, put the poi id', required=True)
-    # parser.add_argument('--subd_id', type=str, help='please, put the subduction id', required=True)
-    # parser.add_argument('--rupt_file', type=str, help='please, put the path of your ruptures input file', required=True)
-    # parser.add_argument('--output_path', type=str, help='provide dir for output_folder', required=True)
-    # parser.add_argument('--plot', action='store_true', help='activate the creation of automatic figures')
-    # parser.add_argument('--gf_path', type=str, help='please, put the path of your greens function local folder', required=True)
-
-    # args = parser.parse_args()
-
-    # variables 
-    subduction = args.subd
-    poi = args.poi
-    subduction_id = args.subd_id
-    rupt_file = args.rupt_file
-    output_path = args.output_path
-    gf_path = args.gf_path
-    plot = args.plot
-
-    # create output folder
-    os.makedirs(output_path, exist_ok=True)
-
+def read_mesh_file_dims(subduction):
+    '''
+    '''
     mesh_file = os.path.join('data', 'meshes/' + subduction + '_Ntot_Nstrike_Ndip.dat')
-    Ntot_Nstrike_Ndip = np.loadtxt(mesh_file)
-    n_strike = int(Ntot_Nstrike_Ndip[1])
-    n_dip = int(Ntot_Nstrike_Ndip[2])
+    n_tot, n_strike, n_dip = np.loadtxt(mesh_file, unpack=True, dtype='int')
+    return n_strike, n_dip
 
-    # ==============================================================================
-    # 1. Read ruptures list (netCDF files)
-    # ==============================================================================
-    print('Reading data....')
 
-    # nc_dav = '/Users/robelix/Temp/gthm26/all_stochastic_slip_earthquake_events_' + subduction + '.nc'
-
+def read_rupture_file(rupt_file):
+    '''
+    '''
     with netCDF4.Dataset(rupt_file) as rupture_file:
        
         # mag_rup = np.array(rupture_file.variables['Mw'])
@@ -82,21 +64,16 @@ def run(args):
             #if "rate_annual" in var and "variable" not in var
             if "rate_annual" in var
         }
-    # print("Rate variables found:", list(all_rate.keys()))
+    return mag_rup, mesh_index, slip_string, all_rate
 
-    scenario_id = [f"{subduction_id}{str(i+1).zfill(7)}" for i in range(len(mesh_index))]
 
-    # ==============================================================================
-    # 2. Davies data conversion
-    # ==============================================================================
-    print('Conversion of strings to values....')
+def mesh_index_conversion(mesh_index, n_strike, n_dip):
+    '''
+    '''
     mesh_index_converted = []
     for row in mesh_index:
-        #line = ''.join(c.decode('utf-8') for c in row).strip()
+        # line = ''.join(c.decode('utf-8') for c in row).strip()
         line = b''.join(row).decode('utf-8').strip()
-
-        #ids_in_line = [int(x) for x in line.split('-') if x.strip()]
-        #remapped_row = [remap(iiii, n_dip, n_strike) + 1 for iiii in ids_in_line]
 
         remapped_row = [
             remap(int(x), n_dip, n_strike) + 1 
@@ -105,67 +82,52 @@ def run(args):
 
         mesh_index_converted.append(remapped_row)
 
+    return mesh_index_converted
 
+
+def slip_conversion(slip_string):
+    '''
+    '''
     split_pattern = re.compile(r'[\s,_]+')
     slip = []
     for row in slip_string:
-        #line = ''.join(c.decode('utf-8') for c in row).strip()
+        # line = ''.join(c.decode('utf-8') for c in row).strip()
         line = b''.join(row).decode('utf-8').strip()
         # split using re by spaces, commas, or underscores without destroying '-'
-        #raw_tokens = re.split(r'[\s,_]+', line)
+        # raw_tokens = re.split(r'[\s,_]+', line)
         raw_tokens = split_pattern.split(line)
         slip_in_line = [
-            #safe_float(x) for x in raw_tokens if safe_float(x) is not None
+            # safe_float(x) for x in raw_tokens if safe_float(x) is not None
             val for x in raw_tokens if (val := safe_float(x)) is not None
         ]
         slip.append(slip_in_line)
 
+    return slip    
 
-    # ==============================================================================
-    # 3. Part for GFs
-    # ==============================================================================
-    print('Generation of GF Matrix....')
 
-    # get poi ID from the string 
-    pois_file = os.path.join('data', 'POI_lon_lat_ID_depth.txt')
-    poi_idx, poi_lon, poi_lat, poi_dep = utilities.get_idx_poi(poi, pois_file)
-    print(f'Selected POI: {poi}, {poi_idx}, {poi_lon}, {poi_lat}, {poi_dep}')
+def define_mih_thresholds(mih_thresholds_file=None):
+    '''
+    Threshold for hc
+    '''
+    if mih_thresholds_file is not None:
+        mih_thresholds = np.load('mih_thresholds.npy', allow_pickle=True)
+    else:
+        ##TODO improve this part of mih definition
+        #mih_thresholds = np.linspace(0.001,50)
+        start = 0.02
+        end = 100.
+        step = (np.log(20.0) - np.log(start)) / 99
+        # Generate log-spaced values from start up to log(100)
+        log_array = np.arange(np.log(start), np.log(end) + step, step)
+        mih_thresholds = np.exp(log_array)
+        # print(mih_thresholds, len(mih_thresholds))
+        # mih_thresholds = np.geomspace(0.02, 100.0, num=100)
+    return mih_thresholds
 
-    # nominal depth fod Green's Law correction 
-    nomin_d = 1.
 
-    # calculate GL 
-    gl = (abs(poi_dep)/nomin_d)**0.25
-
-    # Threshold for hc
-    # mih_thresholds = np.load('mih_thresholds.npy', allow_pickle=True)
-
-    ##TODO improve this part of mih definition
-    #mih_thresholds = np.linspace(0.001,50)
-    start = 0.02
-    end = 100.
-    step = (np.log(20.0) - np.log(start)) / 99
-    # Generate log-spaced values from start up to log(100)
-    log_array = np.arange(np.log(start), np.log(end) + step, step)
-    mih_thresholds = np.exp(log_array)
-    # print(mih_thresholds, len(mih_thresholds))
-    # mih_thresholds = np.geomspace(0.02, 100.0, num=100)
-
-    # gf path
-    # gf_path='/nas/bandabardo/cat/ChEESE2_subductions_GF2/GF2_SRTM_'+subduction+'/'
-    # gf_path = '/scratch/users/bayraktar/Davies_rupts4GTM_GEBCO/GF2_GEBCO_' + subduction + '/'
-    # gf_path = '/Users/robelix/data/ptha_global/greens_functions/'
-    n_timesteps = 17281
-
-    #the_plot = False 
-
-    # gf_subfaults_path = os.path.join(gf_path, subduction, 'GF2')
-    # print(f'Subduction subfaults folder is: {gf_subfaults_path}')
-    # gf_subfaults = [f for f in os.listdir(gf_subfaults_path)] #if not f.startswith('slip')]
-    # n_subfaults = len(gf_subfaults)
-    # print(f'N. of subfaults for {subduction} is: {n_subfaults}')
-
-    big_eta_redux = utilities.greens_functions_db(poi_idx, gf_path, subduction, n_timesteps)
+def get_scenarios_mih(subduction, scenario_id, mesh_index_converted, slip, big_eta_redux, gl):
+    '''
+    '''
     str_eta = big_eta_redux[:,0]
 
     h_max_list = np.zeros(len(scenario_id))
@@ -197,6 +159,60 @@ def run(args):
              h_max_list[i] = np.max(ts_combined)
              h_max_list_gl[i] = np.max(ts_combined * gl)
 
+    return h_max_list, h_max_list_gl
+
+
+
+def run(args):
+
+    # variables from command line parser
+    subduction = args.subd
+    poi = args.poi
+    subduction_id = args.subd_id
+    rupt_file = args.rupt_file
+    output_path = args.output_path
+    gf_path = args.gf_path
+    plot = args.plot
+
+    # create output folder
+    os.makedirs(output_path, exist_ok=True)
+
+    # ==============================================================================
+    # 1. Read input files (mesh, ruptures, pois)
+    # ==============================================================================
+    print('Reading data....')
+    n_strike, n_dip = read_mesh_file_dims(subduction)
+    pois_file = os.path.join('data', 'POI_lon_lat_ID_depth.txt')
+    poi_idx, poi_lon, poi_lat, poi_dep = utilities.get_idx_poi(poi, pois_file)
+    print(f'Selected POI: {poi}, {poi_idx}, {poi_lon}, {poi_lat}, {poi_dep}')
+    mag_rup, mesh_index, slip_string, all_rate = read_rupture_file(rupt_file)
+
+    # creation of scenarios id
+    scenario_id = [f"{subduction_id}{str(i+1).zfill(7)}" for i in range(len(mesh_index))]
+
+    # ==============================================================================
+    # 2. Davies data conversion
+    # ==============================================================================
+    print('Conversion of strings to values....')
+    mesh_index_converted = mesh_index_conversion(mesh_index, n_strike, n_dip)
+    slip = slip_conversion(slip_string)
+
+    # ==============================================================================
+    # 3. GFs
+    # ==============================================================================
+    print('Generation of GF Matrix....')
+
+    # calculate GL
+    gl = greens_law(poi_dep)
+
+    # mih thresholds
+    mih_thresholds = define_mih_thresholds()
+
+    n_timesteps = 17281
+
+    big_eta_redux = utilities.greens_functions_db(poi_idx, gf_path, subduction, n_timesteps)
+
+    h_max_list, h_max_list_gl = get_scenarios_mih(subduction, scenario_id, mesh_index_converted, slip, big_eta_redux, gl)
 
     # ==============================================================================
     # 4. Compute hazard curves using pre-loaded arrays
